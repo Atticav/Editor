@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { requestJob, voiceCatalog } from './core/ai/stubs'
 import type { JobStatus } from './core/ai/contracts'
@@ -33,16 +33,25 @@ function App() {
   const [mediaLibrary, setMediaLibrary] = useState<MediaItem[]>(initialMedia)
   const [captions, setCaptions] = useState<CaptionItem[]>(initialCaptions)
   const [jobs, setJobs] = useState<JobStatus[]>(initialJobs)
-  const [selectedMediaId, setSelectedMediaId] = useState<string>(initialMedia[0]?.id ?? '')
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(initialMedia[0]?.id ?? null)
   const [captionDraft, setCaptionDraft] = useState({ start: '00:00', end: '00:04', text: '' })
   const [narrationText, setNarrationText] = useState('Este tutorial foi criado no Editor.')
   const [selectedVoice, setSelectedVoice] = useState(voiceCatalog[0]?.id ?? '')
   const localUrls = useRef<string[]>([])
 
-  const selectedMedia = useMemo(
-    () => mediaLibrary.find((item) => item.id === selectedMediaId) ?? mediaLibrary[0],
-    [mediaLibrary, selectedMediaId],
-  )
+  const selectedMedia = useMemo(() => {
+    if (mediaLibrary.length === 0) return undefined
+    if (!selectedMediaId) return mediaLibrary[0]
+    return mediaLibrary.find((item) => item.id === selectedMediaId) ?? mediaLibrary[0]
+  }, [mediaLibrary, selectedMediaId])
+
+  useEffect(() => {
+    const urls = localUrls.current
+
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [])
 
   function handleUpload(files: FileList | null): void {
     if (!files || files.length === 0) return
@@ -103,7 +112,7 @@ function App() {
   }
 
   function requestPipeline(type: 'image-to-video' | 'text-to-video' | 'render-export'): void {
-    const job = requestJob(type, { source: selectedMedia?.name ?? 'sem-mídia' })
+    const job = requestJob(type, { sourceMediaName: selectedMedia?.name ?? 'sem-mídia' })
     setJobs((current) => [job, ...current])
   }
 
