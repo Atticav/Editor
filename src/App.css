@@ -9,6 +9,76 @@
   background: #0b1020;
 }
 
+.app-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.landing,
+.dashboard,
+.editor-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.hero h2 {
+  margin: 0 0 0.5rem;
+  max-width: 800px;
+}
+
+.hero p {
+  color: #9ca3af;
+  max-width: 800px;
+}
+
+.feature-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.feature-grid article {
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  padding: 0.6rem;
+}
+
+.feature-grid h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.dashboard-header p {
+  margin: 0.25rem 0 0;
+  color: #9ca3af;
+}
+
+.project-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.project-card {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.project-card h3,
+.project-card p,
+.project-card small {
+  margin: 0;
+}
+
+.project-card p,
+.project-card small {
+  color: #9ca3af;
+}
+
+.project-card.selected {
+  border-color: #2563eb;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -32,6 +102,15 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
+}
+
+.nav-actions {
+  flex-wrap: wrap;
+}
+
+.active-nav {
+  border-color: #2563eb;
+  background: #1e293b;
 }
 
 button,
@@ -136,6 +215,10 @@ button.secondary {
   background: #1e293b;
   border: 1px solid #334155;
   white-space: nowrap;
+}
+
+.clip.active {
+  border-color: #60a5fa;
 }
 
 .side-panel {
