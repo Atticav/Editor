@@ -8,6 +8,10 @@ Base inicial executável de um **editor de vídeo com IA** focado em evolução 
 ## O que já existe neste MVP
 
 - App web em **React + TypeScript + Vite**.
+- Navegação inicial em 3 páginas:
+  - **Landing page** (apresentação do produto e CTA)
+  - **Dashboard de projetos** (cards mockados de projetos)
+  - **Editor** (fluxo principal de edição)
 - Layout inicial profissional com:
   - **Biblioteca de mídia**
   - **Preview/Player**
@@ -28,8 +32,14 @@ Base inicial executável de um **editor de vídeo com IA** focado em evolução 
 
 ```text
 src/
-  App.tsx                  # UI principal do editor e fluxo local
+  App.tsx                  # navegação entre landing, dashboard e editor
+  pages/
+    LandingPage.tsx        # apresentação do produto
+    DashboardPage.tsx      # visão inicial de projetos
+    EditorPage.tsx         # editor com preview, timeline, legendas e TTS
   data/mockData.ts         # dados mockados (mídia, legendas, jobs)
+  data/projects.ts         # dados mockados de projetos
+  types/navigation.ts      # tipos de navegação de telas
   core/ai/contracts.ts     # contratos de tipos para pipelines de IA
   core/ai/stubs.ts         # stubs de integrações e catálogo de vozes
   core/jobs/queue.ts       # fila simulada (ponto de troca para Redis/BullMQ)
@@ -52,6 +62,11 @@ npm run dev
 
 Abrir: `http://localhost:5173`
 
+Fluxo sugerido para validar localmente:
+1. Landing: clique em **Ver projetos**.
+2. Dashboard: selecione um projeto e clique em **Abrir no editor**.
+3. Editor: faça upload de mídia, interaja com a timeline, adicione/edite legendas e teste o TTS mockado.
+
 ### Comandos úteis
 
 ```bash
@@ -65,6 +80,7 @@ npm run build
 - Sem renderização real de vídeo/export final.
 - Sem integração real com provedores de IA/TTS/STT.
 - Jobs assíncronos simulados em memória (sem Redis/BullMQ ainda).
+- Dashboard e projetos ainda operam com dados mockados (sem autenticação nem banco).
 
 ## Próximos passos recomendados
 
