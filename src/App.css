@@ -288,3 +288,102 @@ textarea {
     max-height: none;
   }
 }
+
+/* ── Voice panel ─────────────────────────────────────────────────────────── */
+
+.voice-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.voice-list {
+  width: 100%;
+  min-height: 110px;
+  margin-bottom: 0.5rem;
+  border-radius: 0.45rem;
+  border: 1px solid #334155;
+  background: #020617;
+  color: #e5e7eb;
+  font: inherit;
+  padding: 0.2rem;
+}
+
+.voice-list option {
+  padding: 0.3rem 0.4rem;
+  cursor: pointer;
+}
+
+.voice-list option:checked {
+  background: #1e3a5f;
+  color: #93c5fd;
+}
+
+.voice-detail {
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  padding: 0.55rem;
+  margin-bottom: 0.5rem;
+  background: #0f172a;
+}
+
+.voice-detail-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.35rem;
+}
+
+.voice-badge {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.75rem;
+  color: #93c5fd;
+}
+
+.voice-description {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+  color: #9ca3af;
+  line-height: 1.45;
+}
+
+.voice-use-cases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.voice-tag {
+  background: #0f2a1a;
+  border: 1px solid #166534;
+  border-radius: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.72rem;
+  color: #4ade80;
+}
+
+.voice-field-label {
+  display: block;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin: 0.4rem 0 0.2rem;
+}
+
+.narration-textarea {
+  resize: vertical;
+  min-height: 140px;
+  line-height: 1.5;
+}
+
+.narration-meta {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0.4rem;
+}

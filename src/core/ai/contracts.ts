@@ -19,9 +19,44 @@ export interface JobStatus {
   note: string
 }
 
+export type VoiceGender = 'feminino' | 'masculino' | 'neutro'
+export type VoiceAgeGroup = 'jovem' | 'adulto' | 'idoso'
+export type VoiceEmotion =
+  | 'neutro'
+  | 'feliz'
+  | 'triste'
+  | 'ansioso'
+  | 'sussurrando'
+  | 'medo'
+  | 'surpreso'
+  | 'suspeitando'
+  | 'animado'
+  | 'calmo'
+  | 'sério'
+  | 'dramático'
+  | 'irônico'
+
+export type VoiceUseCase =
+  | 'tutorial'
+  | 'anúncio'
+  | 'narrativa'
+  | 'institucional'
+  | 'dramático'
+  | 'entretenimento'
+  | 'notícias'
+  | 'documentário'
+  | 'audiolibro'
+
 export interface VoiceOption {
   id: string
   label: string
   locale: string
+  language: 'pt-BR' | 'en-US' | 'en-GB' | 'en-AU' | 'en-IN'
+  gender: VoiceGender
+  ageGroup: VoiceAgeGroup
+  accent?: string
   style: string
+  description: string
+  emotions: VoiceEmotion[]
+  useCases: VoiceUseCase[]
 }

@@ -20,7 +20,11 @@ Base inicial executável de um **editor de vídeo com IA** focado em evolução 
 - Fluxo de **upload local** de vídeo/imagem/áudio com pré-visualização.
 - Mídias **mockadas** para demonstrar o produto mesmo sem upload.
 - Módulo de **legendas** com adicionar e editar itens.
-- Módulo de **narração/TTS** com catálogo de vozes (stub).
+- Módulo de **narração/TTS** com catálogo rico de vozes (stub) e seleção de emoção.
+  - **38 vozes** catalogadas cobrindo PT-BR e variantes de Inglês (EUA, Reino Unido, Austrália, Índia).
+  - Filtros de idioma e gênero para facilitar a navegação no catálogo.
+  - Seletor de **emoção** por voz (neutro, feliz, triste, ansioso, sussurrando, medo, surpreso, suspeitando e outras).
+  - Área de roteiro ampliada com contador de palavras/caracteres.
 - Arquitetura inicial preparada para integrações futuras de:
   - imagem → vídeo
   - texto → vídeo
@@ -82,7 +86,62 @@ npm run build
 - Jobs assíncronos simulados em memória (sem Redis/BullMQ ainda).
 - Dashboard e projetos ainda operam com dados mockados (sem autenticação nem banco).
 
-## Próximos passos recomendados
+## Sistema de vozes (catálogo expandido)
+
+O catálogo de vozes vive em `src/core/ai/stubs.ts` e é tipado em `src/core/ai/contracts.ts`.
+
+### Atributos de cada voz
+
+| Atributo | Tipo | Descrição |
+|---|---|---|
+| `id` | string | Identificador único usado no job de TTS |
+| `label` | string | Nome amigável exibido na UI |
+| `locale` | string | BCP-47 locale (ex.: `pt-BR`, `en-US`) |
+| `language` | enum | Idioma/variante (`pt-BR`, `en-US`, `en-GB`, `en-AU`, `en-IN`) |
+| `gender` | enum | `feminino`, `masculino` ou `neutro` |
+| `ageGroup` | enum | `jovem`, `adulto` ou `idoso` |
+| `accent` | string? | Descrição opcional do sotaque |
+| `style` | string | Descrição curta do estilo de narração |
+| `description` | string | Descrição completa para exibição na UI |
+| `emotions` | enum[] | Emoções suportadas pela voz |
+| `useCases` | enum[] | Casos de uso recomendados |
+
+### Emoções suportadas
+
+`neutro` · `feliz` · `triste` · `ansioso` · `sussurrando` · `medo` · `surpreso` · `suspeitando` · `animado` · `calmo` · `sério` · `dramático` · `irônico`
+
+### Casos de uso
+
+`tutorial` · `anúncio` · `narrativa` · `institucional` · `dramático` · `entretenimento` · `notícias` · `documentário` · `audiolibro`
+
+### Vozes PT-BR incluídas
+
+| Voz | Gênero | Idade | Estilo |
+|---|---|---|---|
+| Clara | Feminino | Adulto | Didática natural |
+| Ana | Feminino | Adulto | Suave e acolhedora |
+| Beatriz | Feminino | Adulto | Tranquila e profissional |
+| Camila | Feminino | Jovem | Jovial e natural |
+| Diana | Feminino | Adulto | Narrativa envolvente |
+| Fernanda | Feminino | Adulto | Clara e motivadora |
+| Helena | Feminino | Idoso | Sábia e serena |
+| Isabela | Feminino | Jovem | Amigável e informal |
+| Júlia | Feminino | Adulto | Precisa e técnica |
+| Lívia | Feminino | Adulto | Melodiosa e cativante |
+| Marina | Feminino | Adulto | Dinâmica e expressiva |
+| Rafael | Masculino | Adulto | Narrador técnico |
+| Marcos | Masculino | Adulto | Grave e profissional |
+| Diego | Masculino | Jovem | Energético e jovem |
+
+### Próximos passos para integração real de TTS
+
+1. Escolher um provedor de TTS (ElevenLabs, Azure Cognitive Speech, Google Cloud TTS, OpenAI TTS, etc.).
+2. Substituir `src/core/ai/stubs.ts → requestJob('tts-narration', …)` pelo SDK do provedor escolhido.
+3. Mapear os IDs das vozes do catálogo para os IDs reais do provedor.
+4. Mapear as emoções do catálogo para os parâmetros de estilo/SSML do provedor.
+5. Entregar o áudio gerado ao player para reprodução no editor.
+
+
 
 1. Backend/API para projetos, ativos e timelines persistidas.
 2. Worker de jobs assíncronos (BullMQ + Redis).
