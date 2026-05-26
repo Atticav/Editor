@@ -187,6 +187,7 @@ button.secondary {
   justify-content: center;
   text-align: center;
   padding: 0.75rem;
+  position: relative;
 }
 
 .preview-media {
@@ -386,4 +387,212 @@ textarea {
   font-size: 0.75rem;
   color: #6b7280;
   margin: 0.25rem 0 0.4rem;
+}
+
+/* ── Caption overlay ─────────────────────────────────────────────────────── */
+
+.caption-overlay {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  padding: 0.3rem 0.85rem;
+  border-radius: 0.35rem;
+  font-size: 1rem;
+  text-align: center;
+  max-width: 88%;
+  pointer-events: none;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.mock-placeholder span {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+/* ── Editor tabs ─────────────────────────────────────────────────────────── */
+
+.editor-tabs {
+  display: flex;
+  gap: 0.3rem;
+  border-bottom: 1px solid #1f2937;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #334155;
+  background: #0b1020;
+  color: #9ca3af;
+  border-radius: 0.45rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.tab-btn.active {
+  background: #1e3a5f;
+  border-color: #2563eb;
+  color: #93c5fd;
+}
+
+.tab-hint {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+/* ── Caption form tweaks ─────────────────────────────────────────────────── */
+
+.caption-time-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.caption-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.caption-delete-btn {
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.8rem;
+  border-radius: 0.25rem;
+}
+
+.caption-delete-btn:hover {
+  color: #f87171;
+  background: #1f2937;
+}
+
+.list-empty {
+  color: #4b5563;
+  font-size: 0.85rem;
+  font-style: italic;
+  border: none !important;
+  padding: 0.25rem 0 !important;
+}
+
+/* ── Narration actions ───────────────────────────────────────────────────── */
+
+.narration-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.narration-actions button {
+  flex: 1;
+}
+
+/* ── Job status badges ───────────────────────────────────────────────────── */
+
+.job-status {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.75rem;
+  border: 1px solid transparent;
+}
+
+.job-status-queued {
+  background: #1c2a3a;
+  border-color: #334155;
+  color: #93c5fd;
+}
+
+.job-status-processing {
+  background: #1c2a1c;
+  border-color: #166534;
+  color: #4ade80;
+}
+
+.job-status-done {
+  background: #1c2a1c;
+  border-color: #166534;
+  color: #4ade80;
+}
+
+.job-status-failed {
+  background: #2a1c1c;
+  border-color: #7f1d1d;
+  color: #f87171;
+}
+
+/* ── Media library tweaks ────────────────────────────────────────────────── */
+
+.media-item.mock {
+  opacity: 0.65;
+}
+
+.mock-notice {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+/* ── Dashboard new-project form ──────────────────────────────────────────── */
+
+.new-project-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.new-project-form input {
+  flex: 1;
+  min-width: 180px;
+}
+
+/* ── Dashboard demo section ──────────────────────────────────────────────── */
+
+.demo-section {
+  padding: 0.6rem 0.75rem;
+}
+
+.demo-section h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.9rem;
+  color: #9ca3af;
+}
+
+.demo-notice {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.project-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.project-card-title-row h3 {
+  margin: 0;
+}
+
+.demo-badge {
+  background: #1c2a3a;
+  border: 1px solid #334155;
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  color: #6b7280;
+  white-space: nowrap;
 }

@@ -10,24 +10,36 @@ import {
 } from '../data/mockData'
 import type { ProjectSummary } from '../data/projects'
 
+type EditorTab = 'captions' | 'narration' | 'jobs'
+
 const integrationRoadmap = [
   {
     title: 'Imagem → Vídeo',
-    description: 'Stub de job pronto para integrar provider externo com filas assíncronas.',
+    description: 'Requer provider externo (RunwayML, Kling, etc.). Ponto de integração preparado.',
   },
   {
     title: 'Texto → Vídeo',
-    description: 'Interface pronta para prompt, storyboard e montagem por cenas.',
+    description: 'Interface pronta para prompt e storyboard. Requer provider de geração de vídeo.',
   },
   {
     title: 'Transcrição automática',
-    description: 'Ponto de integração planejado para Whisper/API equivalente.',
+    description: 'Integração planejada para Whisper/API equivalente.',
   },
   {
     title: 'Render/Export',
-    description: 'Camada de job preparada para pipeline com FFmpeg/worker.',
+    description: 'Requer pipeline com FFmpeg ou serviço equivalente de render.',
   },
 ]
+
+function parseTimeToSeconds(t: string): number {
+  const parts = t.split(':').map(Number)
+  if (parts.length === 3) {
+    // HH:MM:SS
+    return (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
+  }
+  // MM:SS
+  return (parts[0] ?? 0) * 60 + (parts[1] ?? 0)
+}
 
 interface EditorPageProps {
   project?: ProjectSummary
@@ -36,6 +48,7 @@ interface EditorPageProps {
 }
 
 export function EditorPage({ project, onBackToDashboard, onBackToLanding }: EditorPageProps) {
+  const [activeTab, setActiveTab] = useState<EditorTab>('captions')
   const [mediaLibrary, setMediaLibrary] = useState<MediaItem[]>(initialMedia)
   const [captions, setCaptions] = useState<CaptionItem[]>(initialCaptions)
   const [jobs, setJobs] = useState<JobStatus[]>(initialJobs)
@@ -46,7 +59,11 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
   const [selectedEmotion, setSelectedEmotion] = useState<VoiceEmotion>('neutro')
   const [voiceFilterLang, setVoiceFilterLang] = useState<string>('all')
   const [voiceFilterGender, setVoiceFilterGender] = useState<string>('all')
+  const [currentTime, setCurrentTime] = useState(0)
+  const [isSpeaking, setIsSpeaking] = useState(false)
   const localUrls = useRef<string[]>([])
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
 
   const selectedMedia = useMemo(() => {
     if (mediaLibrary.length === 0) return undefined
@@ -71,11 +88,37 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
     return currentVoice?.emotions ?? ['neutro']
   }, [currentVoice])
 
+  // Determine which caption to show as overlay on the preview
+  const activeCaptionForOverlay = useMemo<CaptionItem | null>(() => {
+    if (!captions.length) return null
+    // No overlay for audio-only content
+    if (selectedMedia?.kind === 'audio') return null
+    // For real video: sync with currentTime
+    if (selectedMedia?.kind === 'video' && selectedMedia.url) {
+      return (
+        captions.find((c) => {
+          const start = parseTimeToSeconds(c.start)
+          const end = parseTimeToSeconds(c.end)
+          return currentTime >= start && currentTime < end
+        }) ?? null
+      )
+    }
+    // For images or mock/no-url media: show first caption as static preview
+    return captions[0]
+  }, [captions, selectedMedia, currentTime])
+
   useEffect(() => {
     const urls = localUrls.current
-
     return () => {
       urls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel()
+      }
     }
   }, [])
 
@@ -126,16 +169,60 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
     setCaptions((current) => current.map((item) => (item.id === id ? { ...item, text } : item)))
   }
 
-  function enqueueTtsNarration(): void {
+  function deleteCaption(id: string): void {
+    setCaptions((current) => current.filter((item) => item.id !== id))
+  }
+
+  function speakNarration(): void {
     if (!narrationText.trim()) return
 
-    const job = requestJob('tts-narration', {
-      text: narrationText,
-      voiceId: selectedVoice,
-      emotion: selectedEmotion,
-    })
+    if (speechSupported) {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(narrationText)
 
-    setJobs((current) => [job, ...current])
+      const voiceOption = voiceCatalog.find((v) => v.id === selectedVoice)
+      if (voiceOption) {
+        const voices = window.speechSynthesis.getVoices()
+        const localeLang = voiceOption.locale.split('-')[0]
+        const matched =
+          voices.find((v) => v.lang === voiceOption.locale) ??
+          (localeLang ? voices.find((v) => v.lang.startsWith(localeLang)) : undefined)
+        if (matched) utterance.voice = matched
+        utterance.lang = voiceOption.locale
+      }
+
+      utterance.onstart = () => setIsSpeaking(true)
+      utterance.onend = () => setIsSpeaking(false)
+      utterance.onerror = () => setIsSpeaking(false)
+
+      window.speechSynthesis.speak(utterance)
+      setIsSpeaking(true)
+
+      const maxPreviewLength = 60
+      const preview = narrationText.length > maxPreviewLength ? narrationText.slice(0, maxPreviewLength) + '…' : narrationText
+      const job = requestJob('tts-narration', {
+        text: preview,
+        voiceId: selectedVoice,
+        emotion: selectedEmotion,
+        engine: 'Web Speech API (local)',
+      })
+      setJobs((current) => [{ ...job, status: 'done', note: 'Reproduzido via Web Speech API do navegador.' }, ...current])
+    } else {
+      // Web Speech API unavailable — register a stub job for visibility
+      const job = requestJob('tts-narration', {
+        text: narrationText,
+        voiceId: selectedVoice,
+        emotion: selectedEmotion,
+      })
+      setJobs((current) => [job, ...current])
+    }
+  }
+
+  function stopNarration(): void {
+    if (speechSupported) {
+      window.speechSynthesis.cancel()
+    }
+    setIsSpeaking(false)
   }
 
   function requestPipeline(type: 'image-to-video' | 'text-to-video' | 'render-export'): void {
@@ -147,7 +234,11 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
     <main className="editor-page">
       <section className="panel dashboard-header">
         <h2>{project ? `Editor • ${project.name}` : 'Editor'}</h2>
-        <p>Fluxo local funcional com upload, preview, timeline interativa, legendas e narração/TTS.</p>
+        <p>
+          {project?.isDemo
+            ? 'Projeto de demonstração — faça upload de mídia, edite legendas e use a narração por voz local.'
+            : 'Faça upload de mídia, edite legendas e use a narração por voz do navegador.'}
+        </p>
         <div className="top-actions">
           <button type="button" className="secondary" onClick={onBackToLanding}>
             Voltar para landing
@@ -155,11 +246,13 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
           <button type="button" onClick={onBackToDashboard}>
             Voltar para dashboard
           </button>
-          <button type="button" onClick={() => requestPipeline('render-export')}>
-            Exportar (stub)
-          </button>
-          <button type="button" className="secondary" onClick={() => requestPipeline('text-to-video')}>
-            Texto → Vídeo (stub)
+          <button
+            type="button"
+            className="secondary"
+            title="Exportar requer integração com backend/FFmpeg — não disponível nesta versão"
+            onClick={() => requestPipeline('render-export')}
+          >
+            Exportar ↗
           </button>
         </div>
       </section>
@@ -173,17 +266,26 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
               <input type="file" multiple accept="video/*,image/*,audio/*" onChange={(e) => handleUpload(e.target.files)} />
             </label>
           </div>
+          {mediaLibrary.some((item) => item.source === 'mock') && (
+            <p className="mock-notice">Itens com 📦 são de demonstração — faça upload para reprodução real.</p>
+          )}
           <ul>
             {mediaLibrary.map((item) => (
               <li key={item.id}>
                 <button
                   type="button"
-                  className={item.id === selectedMedia?.id ? 'media-item active' : 'media-item'}
+                  className={[
+                    'media-item',
+                    item.id === selectedMedia?.id ? 'active' : '',
+                    item.source === 'mock' ? 'mock' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   onClick={() => setSelectedMediaId(item.id)}
                 >
                   <strong>{item.name}</strong>
                   <span>
-                    {item.kind} • {item.durationLabel} • {item.source}
+                    {item.kind} • {item.durationLabel} • {item.source === 'mock' ? '📦 demo' : '✅ local'}
                   </span>
                 </button>
               </li>
@@ -196,7 +298,13 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
           <div className="preview-frame">
             {!selectedMedia && <p>Envie um arquivo para começar.</p>}
             {selectedMedia?.kind === 'video' && selectedMedia.url && (
-              <video controls src={selectedMedia.url} className="preview-media" />
+              <video
+                ref={videoRef}
+                controls
+                src={selectedMedia.url}
+                className="preview-media"
+                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+              />
             )}
             {selectedMedia?.kind === 'image' && selectedMedia.url && (
               <img src={selectedMedia.url} alt={selectedMedia.name} className="preview-media" />
@@ -205,16 +313,19 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
               <audio controls src={selectedMedia.url} className="preview-audio" />
             )}
             {selectedMedia && !selectedMedia.url && (
-              <p>
+              <p className="mock-placeholder">
                 <strong>{selectedMedia.name}</strong>
                 <br />
-                Item mockado para demonstração. Faça upload local para pré-visualização real.
+                <span>Item de demonstração — faça upload para reproduzir.</span>
               </p>
+            )}
+            {activeCaptionForOverlay && (
+              <div className="caption-overlay">{activeCaptionForOverlay.text}</div>
             )}
           </div>
 
           <div className="timeline">
-            <h3>Timeline (placeholder funcional e interativo)</h3>
+            <h3>Timeline</h3>
             <div className="track">
               {mediaLibrary.map((item) => (
                 <button
@@ -232,185 +343,246 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
         </section>
 
         <aside className="panel side-panel">
-          <section>
-            <h2>Legendas</h2>
-            <div className="caption-form">
-              <input
-                value={captionDraft.start}
-                onChange={(e) => setCaptionDraft((draft) => ({ ...draft, start: e.target.value }))}
-                aria-label="Início"
-                placeholder="Início"
-              />
-              <input
-                value={captionDraft.end}
-                onChange={(e) => setCaptionDraft((draft) => ({ ...draft, end: e.target.value }))}
-                aria-label="Fim"
-                placeholder="Fim"
-              />
-              <input
-                value={captionDraft.text}
-                onChange={(e) => setCaptionDraft((draft) => ({ ...draft, text: e.target.value }))}
-                aria-label="Texto da legenda"
-                placeholder="Texto da legenda"
-              />
-              <button type="button" onClick={addCaption}>
-                Adicionar legenda
-              </button>
-            </div>
-            <ul className="caption-list">
-              {captions.map((item) => (
-                <li key={item.id}>
-                  <span>
-                    {item.start} - {item.end}
-                  </span>
-                  <input value={item.text} onChange={(e) => updateCaption(item.id, e.target.value)} />
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section>
-            <h2>Narração / TTS</h2>
-
-            <div className="voice-filters">
-              <select
-                value={voiceFilterLang}
-                onChange={(e) => {
-                  setVoiceFilterLang(e.target.value)
-                  setSelectedVoice(
-                    voiceCatalog.find((v) => {
-                      const langMatch = e.target.value === 'all' || v.language === e.target.value
-                      const genderMatch = voiceFilterGender === 'all' || v.gender === voiceFilterGender
-                      return langMatch && genderMatch
-                    })?.id ?? voiceCatalog[0]?.id ?? '',
-                  )
-                }}
-                aria-label="Filtrar por idioma"
-              >
-                <option value="all">Todos os idiomas</option>
-                <option value="pt-BR">Português (BR)</option>
-                <option value="en-US">Inglês (EUA)</option>
-                <option value="en-GB">Inglês (Reino Unido)</option>
-                <option value="en-AU">Inglês (Austrália)</option>
-                <option value="en-IN">Inglês (Índia)</option>
-              </select>
-
-              <select
-                value={voiceFilterGender}
-                onChange={(e) => {
-                  setVoiceFilterGender(e.target.value)
-                  setSelectedVoice(
-                    voiceCatalog.find((v) => {
-                      const langMatch = voiceFilterLang === 'all' || v.language === voiceFilterLang
-                      const genderMatch = e.target.value === 'all' || v.gender === e.target.value
-                      return langMatch && genderMatch
-                    })?.id ?? voiceCatalog[0]?.id ?? '',
-                  )
-                }}
-                aria-label="Filtrar por gênero"
-              >
-                <option value="all">Todos os gêneros</option>
-                <option value="feminino">Feminino</option>
-                <option value="masculino">Masculino</option>
-                <option value="neutro">Neutro</option>
-              </select>
-            </div>
-
-            <select
-              value={selectedVoice}
-              onChange={(e) => {
-                setSelectedVoice(e.target.value)
-                setSelectedEmotion('neutro')
-              }}
-              aria-label="Selecionar voz"
-              size={5}
-              className="voice-list"
+          <div className="editor-tabs">
+            <button
+              type="button"
+              className={activeTab === 'captions' ? 'tab-btn active' : 'tab-btn'}
+              onClick={() => setActiveTab('captions')}
             >
-              {filteredVoices.map((voice) => (
-                <option key={voice.id} value={voice.id}>
-                  {voice.label} — {voice.style} [{voice.ageGroup}]
-                </option>
-              ))}
-            </select>
+              Legendas
+            </button>
+            <button
+              type="button"
+              className={activeTab === 'narration' ? 'tab-btn active' : 'tab-btn'}
+              onClick={() => setActiveTab('narration')}
+            >
+              Narração
+            </button>
+            <button
+              type="button"
+              className={activeTab === 'jobs' ? 'tab-btn active' : 'tab-btn'}
+              onClick={() => setActiveTab('jobs')}
+            >
+              IA / Jobs
+            </button>
+          </div>
 
-            {currentVoice && (
-              <div className="voice-detail">
-                <div className="voice-detail-header">
-                  <span className="voice-badge">{currentVoice.language}</span>
-                  <span className="voice-badge">{currentVoice.gender}</span>
-                  <span className="voice-badge">{currentVoice.ageGroup}</span>
-                  {currentVoice.accent && <span className="voice-badge">{currentVoice.accent}</span>}
+          {activeTab === 'captions' && (
+            <section>
+              <p className="tab-hint">
+                Legendas aparecem sobre o preview. Para vídeo, sincronizam com o tempo de reprodução.
+              </p>
+              <div className="caption-form">
+                <div className="caption-time-row">
+                  <input
+                    value={captionDraft.start}
+                    onChange={(e) => setCaptionDraft((draft) => ({ ...draft, start: e.target.value }))}
+                    aria-label="Início"
+                    placeholder="Início (00:00)"
+                  />
+                  <input
+                    value={captionDraft.end}
+                    onChange={(e) => setCaptionDraft((draft) => ({ ...draft, end: e.target.value }))}
+                    aria-label="Fim"
+                    placeholder="Fim (00:04)"
+                  />
                 </div>
-                <p className="voice-description">{currentVoice.description}</p>
-                <div className="voice-use-cases">
-                  {currentVoice.useCases.map((uc) => (
-                    <span key={uc} className="voice-tag">
-                      {uc}
-                    </span>
-                  ))}
-                </div>
+                <input
+                  value={captionDraft.text}
+                  onChange={(e) => setCaptionDraft((draft) => ({ ...draft, text: e.target.value }))}
+                  aria-label="Texto da legenda"
+                  placeholder="Texto da legenda"
+                  onKeyDown={(e) => e.key === 'Enter' && addCaption()}
+                />
+                <button type="button" onClick={addCaption}>
+                  + Adicionar legenda
+                </button>
               </div>
-            )}
+              <ul className="caption-list">
+                {captions.map((item) => (
+                  <li key={item.id}>
+                    <div className="caption-item-header">
+                      <span>
+                        {item.start} → {item.end}
+                      </span>
+                      <button
+                        type="button"
+                        className="caption-delete-btn"
+                        onClick={() => deleteCaption(item.id)}
+                        aria-label="Remover legenda"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <input value={item.text} onChange={(e) => updateCaption(item.id, e.target.value)} />
+                  </li>
+                ))}
+                {captions.length === 0 && <li className="list-empty">Nenhuma legenda adicionada.</li>}
+              </ul>
+            </section>
+          )}
 
-            <label className="voice-field-label" htmlFor="emotion-select">
-              Emoção
-            </label>
-            <select
-              id="emotion-select"
-              value={selectedEmotion}
-              onChange={(e) => setSelectedEmotion(e.target.value as VoiceEmotion)}
-              aria-label="Selecionar emoção"
-            >
-              {availableEmotions.map((emotion) => (
-                <option key={emotion} value={emotion}>
-                  {emotion}
-                </option>
-              ))}
-            </select>
+          {activeTab === 'narration' && (
+            <section>
+              <p className="tab-hint">
+                {speechSupported
+                  ? 'Narração via Web Speech API do navegador — local e gratuita. A voz exata depende das vozes instaladas no sistema.'
+                  : 'Seu navegador não suporta Web Speech API. A narração será registrada como job simulado.'}
+              </p>
 
-            <label className="voice-field-label" htmlFor="narration-textarea">
-              Texto da narração
-            </label>
-            <textarea
-              id="narration-textarea"
-              value={narrationText}
-              onChange={(e) => setNarrationText(e.target.value)}
-              rows={8}
-              placeholder="Digite ou cole o roteiro de narração aqui. Use parágrafos para separar blocos de texto. O texto será processado pela voz e emoção selecionadas."
-              className="narration-textarea"
-            />
-            <div className="narration-meta">
-              <span>{narrationText.trim().split(/\s+/).filter(Boolean).length} palavras</span>
-              <span>{narrationText.length} caracteres</span>
-            </div>
-            <button type="button" onClick={enqueueTtsNarration}>
-              Gerar narração (stub)
-            </button>
-          </section>
+              <div className="voice-filters">
+                <select
+                  value={voiceFilterLang}
+                  onChange={(e) => {
+                    setVoiceFilterLang(e.target.value)
+                    setSelectedVoice(
+                      voiceCatalog.find((v) => {
+                        const langMatch = e.target.value === 'all' || v.language === e.target.value
+                        const genderMatch = voiceFilterGender === 'all' || v.gender === voiceFilterGender
+                        return langMatch && genderMatch
+                      })?.id ?? voiceCatalog[0]?.id ?? '',
+                    )
+                  }}
+                  aria-label="Filtrar por idioma"
+                >
+                  <option value="all">Todos os idiomas</option>
+                  <option value="pt-BR">Português (BR)</option>
+                  <option value="en-US">Inglês (EUA)</option>
+                  <option value="en-GB">Inglês (Reino Unido)</option>
+                  <option value="en-AU">Inglês (Austrália)</option>
+                  <option value="en-IN">Inglês (Índia)</option>
+                </select>
 
-          <section>
-            <h2>IA e Jobs</h2>
-            <div className="roadmap-grid">
-              {integrationRoadmap.map((item) => (
-                <article key={item.title}>
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                </article>
-              ))}
-            </div>
-            <button type="button" className="secondary" onClick={() => requestPipeline('image-to-video')}>
-              Imagem → Vídeo (stub)
-            </button>
-            <ul className="job-list">
-              {jobs.map((job) => (
-                <li key={job.id}>
-                  <strong>{job.type}</strong>
-                  <span>{job.status}</span>
-                  <p>{job.note}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
+                <select
+                  value={voiceFilterGender}
+                  onChange={(e) => {
+                    setVoiceFilterGender(e.target.value)
+                    setSelectedVoice(
+                      voiceCatalog.find((v) => {
+                        const langMatch = voiceFilterLang === 'all' || v.language === voiceFilterLang
+                        const genderMatch = e.target.value === 'all' || v.gender === e.target.value
+                        return langMatch && genderMatch
+                      })?.id ?? voiceCatalog[0]?.id ?? '',
+                    )
+                  }}
+                  aria-label="Filtrar por gênero"
+                >
+                  <option value="all">Todos os gêneros</option>
+                  <option value="feminino">Feminino</option>
+                  <option value="masculino">Masculino</option>
+                  <option value="neutro">Neutro</option>
+                </select>
+              </div>
+
+              <select
+                value={selectedVoice}
+                onChange={(e) => {
+                  setSelectedVoice(e.target.value)
+                  setSelectedEmotion('neutro')
+                }}
+                aria-label="Selecionar voz"
+                size={5}
+                className="voice-list"
+              >
+                {filteredVoices.map((voice) => (
+                  <option key={voice.id} value={voice.id}>
+                    {voice.label} — {voice.style} [{voice.ageGroup}]
+                  </option>
+                ))}
+              </select>
+
+              {currentVoice && (
+                <div className="voice-detail">
+                  <div className="voice-detail-header">
+                    <span className="voice-badge">{currentVoice.language}</span>
+                    <span className="voice-badge">{currentVoice.gender}</span>
+                    <span className="voice-badge">{currentVoice.ageGroup}</span>
+                    {currentVoice.accent && <span className="voice-badge">{currentVoice.accent}</span>}
+                  </div>
+                  <p className="voice-description">{currentVoice.description}</p>
+                  <div className="voice-use-cases">
+                    {currentVoice.useCases.map((uc) => (
+                      <span key={uc} className="voice-tag">
+                        {uc}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <label className="voice-field-label" htmlFor="emotion-select">
+                Emoção
+              </label>
+              <select
+                id="emotion-select"
+                value={selectedEmotion}
+                onChange={(e) => setSelectedEmotion(e.target.value as VoiceEmotion)}
+                aria-label="Selecionar emoção"
+              >
+                {availableEmotions.map((emotion) => (
+                  <option key={emotion} value={emotion}>
+                    {emotion}
+                  </option>
+                ))}
+              </select>
+
+              <label className="voice-field-label" htmlFor="narration-textarea">
+                Texto da narração
+              </label>
+              <textarea
+                id="narration-textarea"
+                value={narrationText}
+                onChange={(e) => setNarrationText(e.target.value)}
+                rows={6}
+                placeholder="Digite o texto para narração..."
+                className="narration-textarea"
+              />
+              <div className="narration-meta">
+                <span>{narrationText.trim().split(/\s+/).filter(Boolean).length} palavras</span>
+                <span>{narrationText.length} caracteres</span>
+              </div>
+              <div className="narration-actions">
+                <button type="button" disabled={isSpeaking || !narrationText.trim()} onClick={speakNarration}>
+                  {isSpeaking ? '🔊 Falando…' : '▶ Falar narração'}
+                </button>
+                {isSpeaking && (
+                  <button type="button" className="secondary" onClick={stopNarration}>
+                    ■ Parar
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'jobs' && (
+            <section>
+              <p className="tab-hint">
+                Pipelines que requerem integração com backend externo. Os botões criam entradas de exemplo — não
+                executam de verdade nesta versão.
+              </p>
+              <div className="roadmap-grid">
+                {integrationRoadmap.map((item) => (
+                  <article key={item.title}>
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
+                  </article>
+                ))}
+              </div>
+              <button type="button" className="secondary" onClick={() => requestPipeline('image-to-video')}>
+                Imagem → Vídeo (requer integração)
+              </button>
+              <ul className="job-list">
+                {jobs.map((job) => (
+                  <li key={job.id}>
+                    <strong>{job.type}</strong>
+                    <span className={`job-status job-status-${job.status}`}>{job.status}</span>
+                    <p>{job.note}</p>
+                  </li>
+                ))}
+                {jobs.length === 0 && <li className="list-empty">Nenhum job registrado.</li>}
+              </ul>
+            </section>
+          )}
         </aside>
       </section>
     </main>
