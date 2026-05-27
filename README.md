@@ -1,59 +1,30 @@
 # Editor
 
-Base inicial executável de um **editor de vídeo com IA** focado em evolução realista.
+Editor de vídeo local em React + TypeScript + Vite.
 
-> Este PR não promete geração “ilimitada” nem “perfeitamente realista”.
-> A geração pesada de vídeo por IA exige custos de GPU, filas e provedores externos.
+> **Honestidade técnica:** Este é um MVP local. Geração pesada de vídeo por IA exige GPU, filas e provedores externos — isso não está incluído nesta versão. O que funciona localmente está claramente indicado abaixo.
 
-## O que já existe neste MVP
+## O que funciona localmente (sem backend)
 
-- App web em **React + TypeScript + Vite**.
-- Navegação inicial em 3 páginas:
-  - **Landing page** (apresentação do produto e CTA)
-  - **Dashboard de projetos** (cards mockados de projetos)
-  - **Editor** (fluxo principal de edição)
-- Layout inicial profissional com:
-  - **Biblioteca de mídia**
-  - **Preview/Player**
-  - **Timeline (placeholder funcional)**
-  - **Painel lateral** para legendas, narração/TTS e IA/jobs.
-- Fluxo de **upload local** de vídeo/imagem/áudio com pré-visualização.
-- Mídias **mockadas** para demonstrar o produto mesmo sem upload.
-- Módulo de **legendas** com adicionar e editar itens.
-- Módulo de **narração/TTS** com catálogo rico de vozes (stub) e seleção de emoção.
-  - **38 vozes** catalogadas cobrindo PT-BR e variantes de Inglês (EUA, Reino Unido, Austrália, Índia).
-  - Filtros de idioma e gênero para facilitar a navegação no catálogo.
-  - Seletor de **emoção** por voz (neutro, feliz, triste, ansioso, sussurrando, medo, surpreso, suspeitando e outras).
-  - Área de roteiro ampliada com contador de palavras/caracteres.
-- Arquitetura inicial preparada para integrações futuras de:
-  - imagem → vídeo
-  - texto → vídeo
-  - transcrição automática
-  - render/export
-  - filas/jobs assíncronos
+- **Upload de mídia** com pré-visualização imediata (vídeo, imagem, áudio).
+- **Legendas sobre o preview** — legendas adicionadas aparecem sobrepostas ao preview. Para vídeo real, sincronizam com o tempo de reprodução.
+- **Narração por voz do navegador** (Web Speech API) — clique em "▶ Falar narração" para reproduzir o texto com a voz do sistema. A voz exata depende das vozes instaladas no seu SO/navegador. A emoção e o estilo são do catálogo — a correspondência com as vozes do sistema é aproximada.
+- **Painel lateral em abas** — Legendas / Narração / IA e Jobs, navegáveis independentemente.
+- **Criar projetos** — botão "Criar projeto" no dashboard cria projetos locais (memória da sessão).
+- **Timeline interativa** — clique nos clipes para selecionar a mídia ativa.
+- **Biblioteca de mídia** — itens de demonstração identificados com 📦; itens reais com ✅.
 
-## Arquitetura inicial
+## O que é demonstração / requer integração futura
 
-```text
-src/
-  App.tsx                  # navegação entre landing, dashboard e editor
-  pages/
-    LandingPage.tsx        # apresentação do produto
-    DashboardPage.tsx      # visão inicial de projetos
-    EditorPage.tsx         # editor com preview, timeline, legendas e TTS
-  data/mockData.ts         # dados mockados (mídia, legendas, jobs)
-  data/projects.ts         # dados mockados de projetos
-  types/navigation.ts      # tipos de navegação de telas
-  core/ai/contracts.ts     # contratos de tipos para pipelines de IA
-  core/ai/stubs.ts         # stubs de integrações e catálogo de vozes
-  core/jobs/queue.ts       # fila simulada (ponto de troca para Redis/BullMQ)
-```
-
-### Princípios adotados
-
-- **Base real e demonstrável localmente**.
-- **Separação de responsabilidades** entre UI, dados mock e contratos de integração.
-- **Honestidade técnica**: funcionalidades de IA avançada estão stubadas, com caminho claro de evolução.
+| Funcionalidade | Status |
+|---|---|
+| Projetos no Dashboard | 3 exemplos de demonstração (`isDemo: true`) — não são seus dados |
+| Persistência de projetos | ❌ Sem backend — dados somem ao recarregar |
+| Exportar vídeo | ❌ Requer FFmpeg/pipeline de render externo |
+| Imagem → Vídeo / Texto → Vídeo | ❌ Requer provider externo (RunwayML, Kling, etc.) |
+| Transcrição automática | ❌ Requer Whisper ou API equivalente |
+| TTS com voz específica/sintética | ❌ Web Speech API usa voz do SO; para vozes sintéticas customizadas, requer ElevenLabs/Azure/OpenAI TTS |
+| Jobs assíncronos reais | ❌ Simulados em memória (sem Redis/BullMQ) |
 
 ## Executando localmente
 
@@ -66,10 +37,12 @@ npm run dev
 
 Abrir: `http://localhost:5173`
 
-Fluxo sugerido para validar localmente:
-1. Landing: clique em **Ver projetos**.
-2. Dashboard: selecione um projeto e clique em **Abrir no editor**.
-3. Editor: faça upload de mídia, interaja com a timeline, adicione/edite legendas e teste o TTS mockado.
+Fluxo sugerido:
+1. **Dashboard** → clique em "+ Criar projeto" para criar um projeto seu, ou selecione um dos exemplos de demonstração.
+2. **Editor** → faça upload de mídia (vídeo/imagem/áudio).
+3. Aba **Legendas** → adicione legendas com tempo de início/fim; elas aparecem sobre o preview.
+4. Aba **Narração** → selecione idioma/gênero/voz, escreva o texto e clique em "▶ Falar narração".
+5. Aba **IA / Jobs** → veja o histórico de jobs registrados na sessão.
 
 ### Comandos úteis
 
@@ -78,75 +51,39 @@ npm run lint
 npm run build
 ```
 
-## Limitações atuais
+## Arquitetura
 
-- Sem backend persistente.
-- Sem renderização real de vídeo/export final.
-- Sem integração real com provedores de IA/TTS/STT.
-- Jobs assíncronos simulados em memória (sem Redis/BullMQ ainda).
-- Dashboard e projetos ainda operam com dados mockados (sem autenticação nem banco).
+```text
+src/
+  App.tsx                  # navegação + estado de projetos do usuário
+  pages/
+    LandingPage.tsx        # apresentação do produto
+    DashboardPage.tsx      # lista de projetos + criação de novo projeto
+    EditorPage.tsx         # editor com abas, preview + overlay de legendas, narração Web Speech API
+  data/mockData.ts         # dados de demonstração (mídia, legendas, jobs iniciais)
+  data/projects.ts         # projetos seed (isDemo: true) + interface ProjectSummary
+  types/navigation.ts      # tipos de navegação de telas
+  core/ai/contracts.ts     # tipos para pipelines de IA
+  core/ai/stubs.ts         # catálogo de vozes (38 vozes PT-BR e Inglês) + stubs de jobs
+  core/jobs/queue.ts       # fila simulada (ponto de troca para Redis/BullMQ)
+```
 
-## Sistema de vozes (catálogo expandido)
+## Sistema de vozes
 
-O catálogo de vozes vive em `src/core/ai/stubs.ts` e é tipado em `src/core/ai/contracts.ts`.
+O catálogo em `src/core/ai/stubs.ts` tem **38 vozes** cobrindo PT-BR e variantes de Inglês (EUA, Reino Unido, Austrália, Índia).
 
-### Atributos de cada voz
+A narração usa **Web Speech API** do navegador: o locale da voz selecionada é passado para o sistema operacional, que usa a voz instalada mais próxima. Para vozes sintéticas personalizadas, é necessário integrar um provedor externo (ElevenLabs, Azure Cognitive Speech, Google Cloud TTS, OpenAI TTS, etc.).
 
-| Atributo | Tipo | Descrição |
-|---|---|---|
-| `id` | string | Identificador único usado no job de TTS |
-| `label` | string | Nome amigável exibido na UI |
-| `locale` | string | BCP-47 locale (ex.: `pt-BR`, `en-US`) |
-| `language` | enum | Idioma/variante (`pt-BR`, `en-US`, `en-GB`, `en-AU`, `en-IN`) |
-| `gender` | enum | `feminino`, `masculino` ou `neutro` |
-| `ageGroup` | enum | `jovem`, `adulto` ou `idoso` |
-| `accent` | string? | Descrição opcional do sotaque |
-| `style` | string | Descrição curta do estilo de narração |
-| `description` | string | Descrição completa para exibição na UI |
-| `emotions` | enum[] | Emoções suportadas pela voz |
-| `useCases` | enum[] | Casos de uso recomendados |
+### Próximos passos para TTS real
 
-### Emoções suportadas
+1. Escolher provedor (ElevenLabs, Azure, Google, OpenAI TTS).
+2. Substituir `speakNarration()` em `EditorPage.tsx` pela chamada ao SDK do provedor.
+3. Mapear IDs e emoções do catálogo para parâmetros do provedor.
+4. Entregar o áudio gerado ao `<audio>` ou `<video>` do player para reprodução sincronizada.
 
-`neutro` · `feliz` · `triste` · `ansioso` · `sussurrando` · `medo` · `surpreso` · `suspeitando` · `animado` · `calmo` · `sério` · `dramático` · `irônico`
+## Limitações conhecidas
 
-### Casos de uso
-
-`tutorial` · `anúncio` · `narrativa` · `institucional` · `dramático` · `entretenimento` · `notícias` · `documentário` · `audiolibro`
-
-### Vozes PT-BR incluídas
-
-| Voz | Gênero | Idade | Estilo |
-|---|---|---|---|
-| Clara | Feminino | Adulto | Didática natural |
-| Ana | Feminino | Adulto | Suave e acolhedora |
-| Beatriz | Feminino | Adulto | Tranquila e profissional |
-| Camila | Feminino | Jovem | Jovial e natural |
-| Diana | Feminino | Adulto | Narrativa envolvente |
-| Fernanda | Feminino | Adulto | Clara e motivadora |
-| Helena | Feminino | Idoso | Sábia e serena |
-| Isabela | Feminino | Jovem | Amigável e informal |
-| Júlia | Feminino | Adulto | Precisa e técnica |
-| Lívia | Feminino | Adulto | Melodiosa e cativante |
-| Marina | Feminino | Adulto | Dinâmica e expressiva |
-| Rafael | Masculino | Adulto | Narrador técnico |
-| Marcos | Masculino | Adulto | Grave e profissional |
-| Diego | Masculino | Jovem | Energético e jovem |
-
-### Próximos passos para integração real de TTS
-
-1. Escolher um provedor de TTS (ElevenLabs, Azure Cognitive Speech, Google Cloud TTS, OpenAI TTS, etc.).
-2. Substituir `src/core/ai/stubs.ts → requestJob('tts-narration', …)` pelo SDK do provedor escolhido.
-3. Mapear os IDs das vozes do catálogo para os IDs reais do provedor.
-4. Mapear as emoções do catálogo para os parâmetros de estilo/SSML do provedor.
-5. Entregar o áudio gerado ao player para reprodução no editor.
-
-
-
-1. Backend/API para projetos, ativos e timelines persistidas.
-2. Worker de jobs assíncronos (BullMQ + Redis).
-3. Pipeline real de transcrição automática (Whisper/API).
-4. Pipeline real de TTS por provider configurável.
-5. Pipeline de render/export com FFmpeg.
-6. Conectores para imagem→vídeo e texto→vídeo com controle de custo/limites.
-7. Políticas de uso justo/BYOK para escalar sem promessas irreais.
+- Sem backend persistente — projetos e uploads somem ao recarregar a página.
+- Sem render/export real de vídeo.
+- Sem integração com provedores de IA/TTS/STT externos.
+- Jobs assíncronos simulados em memória.
