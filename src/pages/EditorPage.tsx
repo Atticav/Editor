@@ -10,6 +10,23 @@ import {
 } from '../data/mockData'
 import type { ProjectSummary } from '../data/projects'
 
+function loadFromStorage<T>(key: string, fallback: T): T {
+  try {
+    const item = localStorage.getItem(key)
+    return item !== null ? (JSON.parse(item) as T) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function saveToStorage(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // quota exceeded or private mode — ignore
+  }
+}
+
 type EditorTab = 'captions' | 'narration' | 'jobs'
 
 const integrationRoadmap = [
@@ -48,21 +65,29 @@ interface EditorPageProps {
 }
 
 export function EditorPage({ project, onBackToDashboard, onBackToLanding }: EditorPageProps) {
+  const projectKey = project?.id ?? 'default'
+
   const [activeTab, setActiveTab] = useState<EditorTab>('captions')
   const [mediaLibrary, setMediaLibrary] = useState<MediaItem[]>(initialMedia)
-  const [captions, setCaptions] = useState<CaptionItem[]>(initialCaptions)
+  const [captions, setCaptions] = useState<CaptionItem[]>(() =>
+    loadFromStorage(`editor-captions-${projectKey}`, initialCaptions),
+  )
   const [jobs, setJobs] = useState<JobStatus[]>(initialJobs)
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(initialMedia[0]?.id ?? null)
   const [captionDraft, setCaptionDraft] = useState({ start: '00:00', end: '00:04', text: '' })
-  const [narrationText, setNarrationText] = useState('Este tutorial foi criado no Editor.')
+  const [narrationText, setNarrationText] = useState<string>(() =>
+    loadFromStorage(`editor-narration-${projectKey}`, 'Este tutorial foi criado no Editor.'),
+  )
   const [selectedVoice, setSelectedVoice] = useState(voiceCatalog[0]?.id ?? '')
   const [selectedEmotion, setSelectedEmotion] = useState<VoiceEmotion>('neutro')
   const [voiceFilterLang, setVoiceFilterLang] = useState<string>('all')
   const [voiceFilterGender, setVoiceFilterGender] = useState<string>('all')
   const [currentTime, setCurrentTime] = useState(0)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([])
   const localUrls = useRef<string[]>([])
   const videoRef = useRef<HTMLVideoElement>(null)
+  const prevProjectKeyRef = useRef<string>(projectKey)
   const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
 
   const selectedMedia = useMemo(() => {
@@ -122,6 +147,37 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
     }
   }, [])
 
+  // Load available browser voices
+  useEffect(() => {
+    if (!speechSupported) return
+    const update = () => setBrowserVoices(window.speechSynthesis.getVoices())
+    update()
+    window.speechSynthesis.addEventListener('voiceschanged', update)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', update)
+  }, [speechSupported])
+
+  // Reload persisted state when project changes
+  useEffect(() => {
+    const key = project?.id ?? 'default'
+    if (prevProjectKeyRef.current === key) return
+    prevProjectKeyRef.current = key
+    setCaptions(loadFromStorage(`editor-captions-${key}`, initialCaptions))
+    setNarrationText(loadFromStorage(`editor-narration-${key}`, 'Este tutorial foi criado no Editor.'))
+    setJobs(initialJobs)
+    setMediaLibrary(initialMedia)
+    setSelectedMediaId(initialMedia[0]?.id ?? null)
+  }, [project?.id])
+
+  // Persist captions on change
+  useEffect(() => {
+    saveToStorage(`editor-captions-${projectKey}`, captions)
+  }, [captions, projectKey])
+
+  // Persist narration text on change
+  useEffect(() => {
+    saveToStorage(`editor-narration-${projectKey}`, narrationText)
+  }, [narrationText, projectKey])
+
   function handleUpload(files: FileList | null): void {
     if (!files || files.length === 0) return
 
@@ -173,6 +229,31 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
     setCaptions((current) => current.filter((item) => item.id !== id))
   }
 
+  function duplicateCaption(id: string): void {
+    setCaptions((current) => {
+      const idx = current.findIndex((c) => c.id === id)
+      if (idx === -1) return current
+      const copy: CaptionItem = { ...current[idx]!, id: `caption-${Date.now()}` }
+      const next = [...current]
+      next.splice(idx + 1, 0, copy)
+      return next
+    })
+  }
+
+  function resetEditorState(): void {
+    setCaptions(initialCaptions)
+    setNarrationText('Este tutorial foi criado no Editor.')
+    setJobs(initialJobs)
+    setMediaLibrary(initialMedia)
+    setSelectedMediaId(initialMedia[0]?.id ?? null)
+    try {
+      localStorage.removeItem(`editor-captions-${projectKey}`)
+      localStorage.removeItem(`editor-narration-${projectKey}`)
+    } catch {
+      // ignore
+    }
+  }
+
   function speakNarration(): void {
     if (!narrationText.trim()) return
 
@@ -182,7 +263,8 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
 
       const voiceOption = voiceCatalog.find((v) => v.id === selectedVoice)
       if (voiceOption) {
-        const voices = window.speechSynthesis.getVoices()
+        // Use already-loaded browserVoices instead of calling getVoices() on every speak
+        const voices = browserVoices.length > 0 ? browserVoices : window.speechSynthesis.getVoices()
         const localeLang = voiceOption.locale.split('-')[0]
         const matched =
           voices.find((v) => v.lang === voiceOption.locale) ??

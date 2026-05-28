@@ -7,6 +7,7 @@ interface DashboardPageProps {
   onSelectProject: (id: string) => void
   onOpenEditor: () => void
   onCreateProject: (name: string) => void
+  onDeleteProject: (id: string) => void
 }
 
 const statusLabel: Record<ProjectSummary['status'], string> = {
@@ -15,8 +16,9 @@ const statusLabel: Record<ProjectSummary['status'], string> = {
   ready: 'Pronto',
 }
 
-export function DashboardPage({ projects, selectedProjectId, onSelectProject, onOpenEditor, onCreateProject }: DashboardPageProps) {
+export function DashboardPage({ projects, selectedProjectId, onSelectProject, onOpenEditor, onCreateProject, onDeleteProject }: DashboardPageProps) {
   const [newName, setNewName] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const userProjects = projects.filter((p) => !p.isDemo)
   const demoProjects = projects.filter((p) => p.isDemo)
@@ -30,11 +32,16 @@ export function DashboardPage({ projects, selectedProjectId, onSelectProject, on
     }
   }
 
+  function handleDeleteConfirm(id: string) {
+    onDeleteProject(id)
+    setConfirmDeleteId(null)
+  }
+
   return (
     <main className="dashboard">
       <section className="panel dashboard-header">
         <h2>Projetos</h2>
-        <p>Selecione um projeto para abrir no editor ou crie um novo.</p>
+        <p>Selecione um projeto para abrir no editor ou crie um novo. Seus projetos são salvos no navegador.</p>
         <form className="new-project-form" onSubmit={handleCreate}>
           <input
             value={newName}
@@ -48,7 +55,11 @@ export function DashboardPage({ projects, selectedProjectId, onSelectProject, on
         </form>
       </section>
 
-      {userProjects.length > 0 && (
+      {userProjects.length === 0 ? (
+        <section className="panel empty-state">
+          <p>Você ainda não tem projetos. Use o formulário acima para criar o seu primeiro projeto.</p>
+        </section>
+      ) : (
         <section className="project-grid">
           {userProjects.map((project) => (
             <article
@@ -74,6 +85,20 @@ export function DashboardPage({ projects, selectedProjectId, onSelectProject, on
                 >
                   Abrir no editor
                 </button>
+                {confirmDeleteId === project.id ? (
+                  <>
+                    <button type="button" className="danger-btn" onClick={() => handleDeleteConfirm(project.id)}>
+                      Confirmar exclusão
+                    </button>
+                    <button type="button" className="secondary" onClick={() => setConfirmDeleteId(null)}>
+                      Cancelar
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className="danger-btn" onClick={() => setConfirmDeleteId(project.id)}>
+                    Excluir
+                  </button>
+                )}
               </div>
             </article>
           ))}

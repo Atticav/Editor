@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import './App.css'
+import { useLocalStorage } from './hooks/useLocalStorage'
 import { projectsSeed } from './data/projects'
 import type { ProjectSummary } from './data/projects'
 import { DashboardPage } from './pages/DashboardPage'
@@ -9,8 +10,8 @@ import type { AppView } from './types/navigation'
 
 function App() {
   const [view, setView] = useState<AppView>('landing')
-  const [userProjects, setUserProjects] = useState<ProjectSummary[]>([])
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [userProjects, setUserProjects] = useLocalStorage<ProjectSummary[]>('editor-user-projects', [])
+  const [selectedProjectId, setSelectedProjectId] = useLocalStorage<string | null>('editor-selected-project', null)
 
   const allProjects = useMemo(() => [...userProjects, ...projectsSeed], [userProjects])
 
@@ -29,6 +30,19 @@ function App() {
     }
     setUserProjects((prev) => [newProject, ...prev])
     setSelectedProjectId(newProject.id)
+  }
+
+  function deleteProject(id: string): void {
+    setUserProjects((prev) => prev.filter((p) => p.id !== id))
+    if (selectedProjectId === id) {
+      setSelectedProjectId(null)
+    }
+    try {
+      localStorage.removeItem(`editor-captions-${id}`)
+      localStorage.removeItem(`editor-narration-${id}`)
+    } catch {
+      // ignore
+    }
   }
 
   return (
@@ -63,6 +77,7 @@ function App() {
           onSelectProject={setSelectedProjectId}
           onOpenEditor={() => setView('editor')}
           onCreateProject={createNewProject}
+          onDeleteProject={deleteProject}
         />
       )}
       {view === 'editor' && (
