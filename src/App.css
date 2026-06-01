@@ -79,6 +79,10 @@
   border-color: #2563eb;
 }
 
+.user-project {
+  border-color: #1d4ed8;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -208,6 +212,7 @@ button.secondary {
   gap: 0.45rem;
   overflow-x: auto;
   padding-bottom: 0.25rem;
+  align-items: center;
 }
 
 .clip {
@@ -254,6 +259,11 @@ textarea {
   padding: 0.5rem;
   display: grid;
   gap: 0.35rem;
+}
+
+.caption-list li.active-caption {
+  border-color: #2563eb;
+  box-shadow: inset 0 0 0 1px #2563eb;
 }
 
 .caption-list span {
@@ -545,6 +555,12 @@ textarea {
   color: #6b7280;
 }
 
+.active-media-note {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  color: #93c5fd;
+}
+
 /* ── Dashboard new-project form ──────────────────────────────────────────── */
 
 .new-project-form {
@@ -595,4 +611,58 @@ textarea {
   font-size: 0.7rem;
   color: #6b7280;
   white-space: nowrap;
+}
+
+.user-badge {
+  background: #10243a;
+  border: 1px solid #1d4ed8;
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  color: #93c5fd;
+  white-space: nowrap;
+}
+
+.empty-state h3,
+.empty-state p {
+  margin: 0;
+}
+
+.empty-state p {
+  margin-top: 0.3rem;
+  color: #9ca3af;
+}
+
+.speech-notice {
+  margin: 0 0 0.6rem;
+  border: 1px solid #334155;
+  border-radius: 0.45rem;
+  padding: 0.4rem 0.5rem;
+  background: #0f172a;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .editor-tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab-btn {
+    min-width: 120px;
+    flex: 1 1 120px;
+  }
+
+  .voice-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .project-grid {
+    grid-template-columns: 1fr;
+  }
 }

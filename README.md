@@ -10,20 +10,25 @@ Editor de vídeo local em React + TypeScript + Vite.
 - **Legendas sobre o preview** — legendas adicionadas aparecem sobrepostas ao preview. Para vídeo real, sincronizam com o tempo de reprodução.
 - **Narração por voz do navegador** (Web Speech API) — clique em "▶ Falar narração" para reproduzir o texto com a voz do sistema. A voz exata depende das vozes instaladas no seu SO/navegador. A emoção e o estilo são do catálogo — a correspondência com as vozes do sistema é aproximada.
 - **Painel lateral em abas** — Legendas / Narração / IA e Jobs, navegáveis independentemente.
-- **Criar projetos** — botão "Criar projeto" no dashboard cria projetos locais (memória da sessão).
+- **Projetos locais úteis** — criação rápida no dashboard, separação visual entre projeto seu e projeto demo, e persistência em `localStorage`.
+- **Persistência por projeto** — legendas, texto de narração e aba ativa do editor ficam salvos em `localStorage` por projeto.
 - **Timeline interativa** — clique nos clipes para selecionar a mídia ativa.
 - **Biblioteca de mídia** — itens de demonstração identificados com 📦; itens reais com ✅.
+- **Controles rápidos de conforto** — limpar jobs, limpar legendas, duplicar legenda e resetar dados locais.
 
 ## O que é demonstração / requer integração futura
 
 | Funcionalidade | Status |
 |---|---|
-| Projetos no Dashboard | 3 exemplos de demonstração (`isDemo: true`) — não são seus dados |
-| Persistência de projetos | ❌ Sem backend — dados somem ao recarregar |
+| Projetos no Dashboard | ✅ Criação de projetos locais com persistência no navegador |
+| Projetos demo | ✅ Mantidos como referência visual (`isDemo: true`) |
+| Último projeto selecionado | ✅ Persistido em `localStorage` |
+| Persistência de legendas/narração/aba | ✅ Por projeto, em `localStorage` |
+| Uploads locais de mídia | ⚠️ Não persistem após recarregar (limitação do browser sem backend/File System API) |
 | Exportar vídeo | ❌ Requer FFmpeg/pipeline de render externo |
 | Imagem → Vídeo / Texto → Vídeo | ❌ Requer provider externo (RunwayML, Kling, etc.) |
 | Transcrição automática | ❌ Requer Whisper ou API equivalente |
-| TTS com voz específica/sintética | ❌ Web Speech API usa voz do SO; para vozes sintéticas customizadas, requer ElevenLabs/Azure/OpenAI TTS |
+| TTS com voz específica/sintética | ⚠️ Web Speech API usa vozes instaladas no SO; para vozes sintéticas customizadas, requer ElevenLabs/Azure/OpenAI TTS |
 | Jobs assíncronos reais | ❌ Simulados em memória (sem Redis/BullMQ) |
 
 ## Executando localmente
@@ -38,11 +43,11 @@ npm run dev
 Abrir: `http://localhost:5173`
 
 Fluxo sugerido:
-1. **Dashboard** → clique em "+ Criar projeto" para criar um projeto seu, ou selecione um dos exemplos de demonstração.
+1. **Dashboard** → clique em "+ Criar projeto" para criar um projeto seu (salvo localmente), ou selecione um dos exemplos de demonstração.
 2. **Editor** → faça upload de mídia (vídeo/imagem/áudio).
-3. Aba **Legendas** → adicione legendas com tempo de início/fim; elas aparecem sobre o preview.
-4. Aba **Narração** → selecione idioma/gênero/voz, escreva o texto e clique em "▶ Falar narração".
-5. Aba **IA / Jobs** → veja o histórico de jobs registrados na sessão.
+3. Aba **Legendas** → adicione, duplique ou limpe legendas; elas aparecem sobre o preview e ficam salvas por projeto.
+4. Aba **Narração** → selecione idioma/gênero/voz, escreva o texto e clique em "▶ Falar narração". O texto fica salvo localmente.
+5. Aba **IA / Jobs** → veja e limpe o histórico de jobs da sessão.
 
 ### Comandos úteis
 
@@ -55,11 +60,11 @@ npm run build
 
 ```text
 src/
-  App.tsx                  # navegação + estado de projetos do usuário
+  App.tsx                  # navegação + projetos locais + seleção persistida
   pages/
     LandingPage.tsx        # apresentação do produto
-    DashboardPage.tsx      # lista de projetos + criação de novo projeto
-    EditorPage.tsx         # editor com abas, preview + overlay de legendas, narração Web Speech API
+    DashboardPage.tsx      # projetos locais vs demo + criação/reset de dados locais
+    EditorPage.tsx         # editor com persistência por projeto, overlay de legendas e narração Web Speech API
   data/mockData.ts         # dados de demonstração (mídia, legendas, jobs iniciais)
   data/projects.ts         # projetos seed (isDemo: true) + interface ProjectSummary
   types/navigation.ts      # tipos de navegação de telas
@@ -83,7 +88,8 @@ A narração usa **Web Speech API** do navegador: o locale da voz selecionada é
 
 ## Limitações conhecidas
 
-- Sem backend persistente — projetos e uploads somem ao recarregar a página.
+- Sem backend persistente — uploads locais de mídia somem ao recarregar a página.
 - Sem render/export real de vídeo.
 - Sem integração com provedores de IA/TTS/STT externos.
+- Web Speech API depende de suporte do navegador e de vozes instaladas no sistema.
 - Jobs assíncronos simulados em memória.

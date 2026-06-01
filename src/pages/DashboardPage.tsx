@@ -7,6 +7,7 @@ interface DashboardPageProps {
   onSelectProject: (id: string) => void
   onOpenEditor: () => void
   onCreateProject: (name: string) => void
+  onResetLocalProjects: () => void
 }
 
 const statusLabel: Record<ProjectSummary['status'], string> = {
@@ -15,7 +16,14 @@ const statusLabel: Record<ProjectSummary['status'], string> = {
   ready: 'Pronto',
 }
 
-export function DashboardPage({ projects, selectedProjectId, onSelectProject, onOpenEditor, onCreateProject }: DashboardPageProps) {
+export function DashboardPage({
+  projects,
+  selectedProjectId,
+  onSelectProject,
+  onOpenEditor,
+  onCreateProject,
+  onResetLocalProjects,
+}: DashboardPageProps) {
   const [newName, setNewName] = useState('')
 
   const userProjects = projects.filter((p) => !p.isDemo)
@@ -34,7 +42,7 @@ export function DashboardPage({ projects, selectedProjectId, onSelectProject, on
     <main className="dashboard">
       <section className="panel dashboard-header">
         <h2>Projetos</h2>
-        <p>Selecione um projeto para abrir no editor ou crie um novo.</p>
+        <p>Crie projetos para uso pessoal. Seus projetos ficam salvos no navegador (localStorage).</p>
         <form className="new-project-form" onSubmit={handleCreate}>
           <input
             value={newName}
@@ -45,17 +53,23 @@ export function DashboardPage({ projects, selectedProjectId, onSelectProject, on
           <button type="submit" disabled={!newName.trim()}>
             + Criar projeto
           </button>
+          <button type="button" className="secondary" onClick={onResetLocalProjects} disabled={userProjects.length === 0}>
+            Resetar dados locais
+          </button>
         </form>
       </section>
 
-      {userProjects.length > 0 && (
+      {userProjects.length > 0 ? (
         <section className="project-grid">
           {userProjects.map((project) => (
             <article
               key={project.id}
-              className={project.id === selectedProjectId ? 'panel project-card selected' : 'panel project-card'}
+              className={project.id === selectedProjectId ? 'panel project-card selected user-project' : 'panel project-card user-project'}
             >
-              <h3>{project.name}</h3>
+              <div className="project-card-title-row">
+                <h3>{project.name}</h3>
+                <span className="user-badge">Seu projeto</span>
+              </div>
               <p>{project.summary}</p>
               <small>
                 {statusLabel[project.status]} • {project.durationLabel} • {project.updatedAt}
@@ -77,6 +91,11 @@ export function DashboardPage({ projects, selectedProjectId, onSelectProject, on
               </div>
             </article>
           ))}
+        </section>
+      ) : (
+        <section className="panel empty-state">
+          <h3>Nenhum projeto seu ainda</h3>
+          <p>Digite um nome e clique em "+ Criar projeto" para começar rapidamente.</p>
         </section>
       )}
 

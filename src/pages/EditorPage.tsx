@@ -12,6 +12,16 @@ import type { ProjectSummary } from '../data/projects'
 
 type EditorTab = 'captions' | 'narration' | 'jobs'
 
+interface PersistedEditorState {
+  captions: CaptionItem[]
+  narrationText: string
+  activeTab: EditorTab
+}
+
+const PROJECT_EDITOR_STORAGE_PREFIX = 'editor:project:'
+const defaultCaptionDraft = { start: '00:00', end: '00:04', text: '' }
+const defaultNarrationText = 'Este tutorial foi criado no Editor.'
+
 const integrationRoadmap = [
   {
     title: 'Imagem → Vídeo',
@@ -41,6 +51,38 @@ function parseTimeToSeconds(t: string): number {
   return (parts[0] ?? 0) * 60 + (parts[1] ?? 0)
 }
 
+function getProjectEditorStorageKey(projectId?: string): string | null {
+  if (!projectId) return null
+  return `${PROJECT_EDITOR_STORAGE_PREFIX}${projectId}:editor-state:v1`
+}
+
+function readPersistedEditorState(projectId?: string): PersistedEditorState | null {
+  if (typeof window === 'undefined') return null
+  const key = getProjectEditorStorageKey(projectId)
+  if (!key) return null
+
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed?.captions) || typeof parsed?.narrationText !== 'string') return null
+    const activeTab: EditorTab = parsed.activeTab === 'narration' || parsed.activeTab === 'jobs' ? parsed.activeTab : 'captions'
+    return {
+      captions: parsed.captions.filter(
+        (item: CaptionItem) =>
+          typeof item?.id === 'string' &&
+          typeof item?.start === 'string' &&
+          typeof item?.end === 'string' &&
+          typeof item?.text === 'string',
+      ),
+      narrationText: parsed.narrationText,
+      activeTab,
+    }
+  } catch {
+    return null
+  }
+}
+
 interface EditorPageProps {
   project?: ProjectSummary
   onBackToDashboard: () => void
@@ -48,19 +90,22 @@ interface EditorPageProps {
 }
 
 export function EditorPage({ project, onBackToDashboard, onBackToLanding }: EditorPageProps) {
-  const [activeTab, setActiveTab] = useState<EditorTab>('captions')
+  const initialPersistedState = readPersistedEditorState(project?.id)
+  const [activeTab, setActiveTab] = useState<EditorTab>(initialPersistedState?.activeTab ?? 'captions')
   const [mediaLibrary, setMediaLibrary] = useState<MediaItem[]>(initialMedia)
-  const [captions, setCaptions] = useState<CaptionItem[]>(initialCaptions)
+  const [captions, setCaptions] = useState<CaptionItem[]>(initialPersistedState?.captions ?? initialCaptions)
   const [jobs, setJobs] = useState<JobStatus[]>(initialJobs)
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(initialMedia[0]?.id ?? null)
-  const [captionDraft, setCaptionDraft] = useState({ start: '00:00', end: '00:04', text: '' })
-  const [narrationText, setNarrationText] = useState('Este tutorial foi criado no Editor.')
+  const [captionDraft, setCaptionDraft] = useState(defaultCaptionDraft)
+  const [narrationText, setNarrationText] = useState(initialPersistedState?.narrationText ?? defaultNarrationText)
   const [selectedVoice, setSelectedVoice] = useState(voiceCatalog[0]?.id ?? '')
   const [selectedEmotion, setSelectedEmotion] = useState<VoiceEmotion>('neutro')
   const [voiceFilterLang, setVoiceFilterLang] = useState<string>('all')
   const [voiceFilterGender, setVoiceFilterGender] = useState<string>('all')
   const [currentTime, setCurrentTime] = useState(0)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [systemVoices, setSystemVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [narrationNotice, setNarrationNotice] = useState<string | null>(null)
   const localUrls = useRef<string[]>([])
   const videoRef = useRef<HTMLVideoElement>(null)
   const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
@@ -107,6 +152,17 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
     return captions[0]
   }, [captions, selectedMedia, currentTime])
 
+  const activeCaptionId = useMemo<string | null>(() => {
+    if (selectedMedia?.kind !== 'video' || !selectedMedia.url) return null
+    return (
+      captions.find((c) => {
+        const start = parseTimeToSeconds(c.start)
+        const end = parseTimeToSeconds(c.end)
+        return currentTime >= start && currentTime < end
+      })?.id ?? null
+    )
+  }, [captions, selectedMedia, currentTime])
+
   useEffect(() => {
     const urls = localUrls.current
     return () => {
@@ -121,6 +177,30 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!speechSupported) return
+    const synth = window.speechSynthesis
+    const updateVoices = () => {
+      const availableVoices = synth.getVoices()
+      setSystemVoices(availableVoices)
+    }
+    updateVoices()
+    synth.addEventListener('voiceschanged', updateVoices)
+    return () => synth.removeEventListener('voiceschanged', updateVoices)
+  }, [speechSupported])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const key = getProjectEditorStorageKey(project?.id)
+    if (!key) return
+    const payload: PersistedEditorState = {
+      captions,
+      narrationText,
+      activeTab,
+    }
+    window.localStorage.setItem(key, JSON.stringify(payload))
+  }, [project?.id, captions, narrationText, activeTab])
 
   function handleUpload(files: FileList | null): void {
     if (!files || files.length === 0) return
@@ -165,12 +245,34 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
     setCaptionDraft((draft) => ({ ...draft, text: '' }))
   }
 
+  function duplicateCaption(id: string): void {
+    setCaptions((current) => {
+      const target = current.find((item) => item.id === id)
+      if (!target) return current
+      return [
+        ...current,
+        {
+          ...target,
+          id: `caption-${Date.now()}`,
+        },
+      ]
+    })
+  }
+
   function updateCaption(id: string, text: string): void {
     setCaptions((current) => current.map((item) => (item.id === id ? { ...item, text } : item)))
   }
 
   function deleteCaption(id: string): void {
     setCaptions((current) => current.filter((item) => item.id !== id))
+  }
+
+  function clearCaptions(): void {
+    setCaptions([])
+  }
+
+  function clearJobs(): void {
+    setJobs([])
   }
 
   function speakNarration(): void {
@@ -181,19 +283,41 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
       const utterance = new SpeechSynthesisUtterance(narrationText)
 
       const voiceOption = voiceCatalog.find((v) => v.id === selectedVoice)
+      let selectedVoiceLabel = 'voz padrão do navegador'
+      let selectedVoiceNote = 'Narração local reproduzida com sucesso.'
       if (voiceOption) {
-        const voices = window.speechSynthesis.getVoices()
+        const voices = systemVoices.length ? systemVoices : window.speechSynthesis.getVoices()
         const localeLang = voiceOption.locale.split('-')[0]
         const matched =
           voices.find((v) => v.lang === voiceOption.locale) ??
           (localeLang ? voices.find((v) => v.lang.startsWith(localeLang)) : undefined)
-        if (matched) utterance.voice = matched
+        if (matched) {
+          utterance.voice = matched
+          selectedVoiceLabel = `${matched.name} (${matched.lang})`
+          if (matched.lang !== voiceOption.locale) {
+            selectedVoiceNote = `Voz exata "${voiceOption.label}" não encontrada. Usando ${selectedVoiceLabel}.`
+          }
+        } else if (voices.length > 0) {
+          const fallbackVoice = voices[0]
+          utterance.voice = fallbackVoice
+          selectedVoiceLabel = `${fallbackVoice.name} (${fallbackVoice.lang})`
+          selectedVoiceNote = `Não há voz compatível com ${voiceOption.locale} instalada. Usando ${selectedVoiceLabel}.`
+        } else {
+          selectedVoiceNote =
+            'O navegador não listou vozes instaladas. Tente novamente ou instale vozes no sistema para maior controle.'
+        }
         utterance.lang = voiceOption.locale
       }
 
-      utterance.onstart = () => setIsSpeaking(true)
+      utterance.onstart = () => {
+        setIsSpeaking(true)
+        setNarrationNotice(selectedVoiceNote)
+      }
       utterance.onend = () => setIsSpeaking(false)
-      utterance.onerror = () => setIsSpeaking(false)
+      utterance.onerror = () => {
+        setIsSpeaking(false)
+        setNarrationNotice('Não foi possível reproduzir a narração agora. Verifique permissões e vozes do navegador.')
+      }
 
       window.speechSynthesis.speak(utterance)
       setIsSpeaking(true)
@@ -206,9 +330,12 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
         emotion: selectedEmotion,
         engine: 'Web Speech API (local)',
       })
-      setJobs((current) => [{ ...job, status: 'done', note: 'Reproduzido via Web Speech API do navegador.' }, ...current])
+      setJobs((current) => [{ ...job, status: 'done', note: `Reproduzido localmente com ${selectedVoiceLabel}.` }, ...current])
     } else {
       // Web Speech API unavailable — register a stub job for visibility
+      setNarrationNotice(
+        'Este navegador não oferece Web Speech API para reprodução local. Você ainda pode salvar o texto e testar em Chrome/Edge.',
+      )
       const job = requestJob('tts-narration', {
         text: narrationText,
         voiceId: selectedVoice,
@@ -237,7 +364,8 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
         <p>
           {project?.isDemo
             ? 'Projeto de demonstração — faça upload de mídia, edite legendas e use a narração por voz local.'
-            : 'Faça upload de mídia, edite legendas e use a narração por voz do navegador.'}
+            : 'Faça upload de mídia, edite legendas e use a narração por voz do navegador.'}{' '}
+          Legendas e texto da narração são salvos localmente por projeto.
         </p>
         <div className="top-actions">
           <button type="button" className="secondary" onClick={onBackToLanding}>
@@ -266,6 +394,7 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
               <input type="file" multiple accept="video/*,image/*,audio/*" onChange={(e) => handleUpload(e.target.files)} />
             </label>
           </div>
+          <p className="mock-notice">Arquivos locais enviados não podem ser restaurados após recarregar a página.</p>
           {mediaLibrary.some((item) => item.source === 'mock') && (
             <p className="mock-notice">Itens com 📦 são de demonstração — faça upload para reprodução real.</p>
           )}
@@ -290,11 +419,17 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
                 </button>
               </li>
             ))}
+            {mediaLibrary.length === 0 && <li className="list-empty">Nenhuma mídia carregada. Faça upload para começar.</li>}
           </ul>
         </section>
 
         <section className="panel preview-panel">
           <h2>Preview / Player</h2>
+          <p className="active-media-note">
+            {selectedMedia
+              ? `Mídia ativa: ${selectedMedia.name} (${selectedMedia.kind}, ${selectedMedia.source === 'mock' ? 'demo' : 'local'})`
+              : 'Nenhuma mídia selecionada'}
+          </p>
           <div className="preview-frame">
             {!selectedMedia && <p>Envie um arquivo para começar.</p>}
             {selectedMedia?.kind === 'video' && selectedMedia.url && (
@@ -338,6 +473,7 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
                   {item.name}
                 </button>
               ))}
+              {mediaLibrary.length === 0 && <span className="list-empty">Timeline vazia.</span>}
             </div>
           </div>
         </section>
@@ -397,22 +533,35 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
                 <button type="button" onClick={addCaption}>
                   + Adicionar legenda
                 </button>
+                <button type="button" className="secondary" onClick={clearCaptions} disabled={captions.length === 0}>
+                  Limpar legendas
+                </button>
               </div>
               <ul className="caption-list">
                 {captions.map((item) => (
-                  <li key={item.id}>
+                  <li key={item.id} className={item.id === activeCaptionId ? 'active-caption' : ''}>
                     <div className="caption-item-header">
                       <span>
                         {item.start} → {item.end}
                       </span>
-                      <button
-                        type="button"
-                        className="caption-delete-btn"
-                        onClick={() => deleteCaption(item.id)}
-                        aria-label="Remover legenda"
-                      >
-                        ✕
-                      </button>
+                      <div className="top-actions">
+                        <button
+                          type="button"
+                          className="caption-delete-btn"
+                          onClick={() => duplicateCaption(item.id)}
+                          aria-label="Duplicar legenda"
+                        >
+                          Duplicar
+                        </button>
+                        <button
+                          type="button"
+                          className="caption-delete-btn"
+                          onClick={() => deleteCaption(item.id)}
+                          aria-label="Remover legenda"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                     <input value={item.text} onChange={(e) => updateCaption(item.id, e.target.value)} />
                   </li>
@@ -427,8 +576,14 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
               <p className="tab-hint">
                 {speechSupported
                   ? 'Narração via Web Speech API do navegador — local e gratuita. A voz exata depende das vozes instaladas no sistema.'
-                  : 'Seu navegador não suporta Web Speech API. A narração será registrada como job simulado.'}
+                  : 'Seu navegador não suporta Web Speech API. O texto da narração continua salvo localmente para você não perder conteúdo.'}
               </p>
+              {speechSupported && systemVoices.length === 0 && (
+                <p className="tab-hint">
+                  As vozes do sistema ainda não foram carregadas. Se necessário, aguarde alguns segundos ou recarregue.
+                </p>
+              )}
+              {narrationNotice && <p className="speech-notice">{narrationNotice}</p>}
 
               <div className="voice-filters">
                 <select
@@ -560,6 +715,9 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
                 Pipelines que requerem integração com backend externo. Os botões criam entradas de exemplo — não
                 executam de verdade nesta versão.
               </p>
+              <button type="button" className="secondary" onClick={clearJobs} disabled={jobs.length === 0}>
+                Limpar jobs
+              </button>
               <div className="roadmap-grid">
                 {integrationRoadmap.map((item) => (
                   <article key={item.title}>
