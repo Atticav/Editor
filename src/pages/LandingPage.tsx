@@ -6,8 +6,8 @@ interface LandingPageProps {
 const highlights = [
   'Upload local de mídia com preview imediato',
   'Timeline inicial interativa para organizar clipes',
-  'Legendas editáveis diretamente na interface',
-  'Narração/TTS com vozes mockadas e arquitetura extensível',
+  'Legendas e texto da narração salvos localmente por projeto',
+  'Narração/TTS local com Web Speech API e feedback de compatibilidade',
 ]
 
 export function LandingPage({ onOpenDashboard, onOpenEditor }: LandingPageProps) {
