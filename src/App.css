@@ -474,7 +474,7 @@ textarea {
   align-items: center;
 }
 
-.caption-delete-btn {
+.caption-action-btn {
   background: transparent;
   border: none;
   color: #6b7280;
@@ -484,8 +484,8 @@ textarea {
   border-radius: 0.25rem;
 }
 
-.caption-delete-btn:hover {
-  color: #f87171;
+.caption-action-btn:hover {
+  color: #93c5fd;
   background: #1f2937;
 }
 

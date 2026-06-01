@@ -24,7 +24,7 @@ Editor de vídeo local em React + TypeScript + Vite.
 | Projetos demo | ✅ Mantidos como referência visual (`isDemo: true`) |
 | Último projeto selecionado | ✅ Persistido em `localStorage` |
 | Persistência de legendas/narração/aba | ✅ Por projeto, em `localStorage` |
-| Uploads locais de mídia | ⚠️ Não persistem após recarregar (limitação do browser sem backend/File System API) |
+| Uploads locais de mídia | ⚠️ Não persistem após recarregar (limitação do navegador sem backend/File System API) |
 | Exportar vídeo | ❌ Requer FFmpeg/pipeline de render externo |
 | Imagem → Vídeo / Texto → Vídeo | ❌ Requer provider externo (RunwayML, Kling, etc.) |
 | Transcrição automática | ❌ Requer Whisper ou API equivalente |

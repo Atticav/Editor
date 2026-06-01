@@ -68,7 +68,9 @@ export function DashboardPage({
             >
               <div className="project-card-title-row">
                 <h3>{project.name}</h3>
-                <span className="user-badge">Seu projeto</span>
+                <span className="user-badge" aria-label="Projeto criado por você">
+                  Seu projeto
+                </span>
               </div>
               <p>{project.summary}</p>
               <small>

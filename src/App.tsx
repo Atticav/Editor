@@ -35,10 +35,13 @@ function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => readStoredSelectedProjectId())
 
   const allProjects = useMemo(() => [...userProjects, ...projectsSeed], [userProjects])
-  const resolvedSelectedProjectId =
-    selectedProjectId && allProjects.some((item) => item.id === selectedProjectId)
-      ? selectedProjectId
-      : allProjects[0]?.id ?? null
+  const resolvedSelectedProjectId = useMemo(
+    () =>
+      selectedProjectId && allProjects.some((item) => item.id === selectedProjectId)
+        ? selectedProjectId
+        : allProjects[0]?.id ?? null,
+    [selectedProjectId, allProjects],
+  )
 
   const selectedProject =
     allProjects.find((item) => item.id === resolvedSelectedProjectId) ?? allProjects[0]
@@ -119,7 +122,6 @@ function App() {
       )}
       {view === 'editor' && (
         <EditorPage
-          key={selectedProject?.id ?? 'editor-default'}
           project={selectedProject}
           onBackToDashboard={() => setView('dashboard')}
           onBackToLanding={() => setView('landing')}

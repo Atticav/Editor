@@ -22,6 +22,14 @@ const PROJECT_EDITOR_STORAGE_PREFIX = 'editor:project:'
 const defaultCaptionDraft = { start: '00:00', end: '00:04', text: '' }
 const defaultNarrationText = 'Este tutorial foi criado no Editor.'
 
+function createLocalId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`
+  }
+  const timer = typeof performance !== 'undefined' ? performance.now().toFixed(5) : '0'
+  return `${prefix}-${Date.now()}-${timer}-${Math.round(Math.random() * 1_000_000)}`
+}
+
 const integrationRoadmap = [
   {
     title: 'Imagem → Vídeo',
@@ -65,8 +73,12 @@ function readPersistedEditorState(projectId?: string): PersistedEditorState | nu
     const raw = window.localStorage.getItem(key)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed?.captions) || typeof parsed?.narrationText !== 'string') return null
-    const activeTab: EditorTab = parsed.activeTab === 'narration' || parsed.activeTab === 'jobs' ? parsed.activeTab : 'captions'
+    if (typeof parsed !== 'object' || parsed === null) return null
+    if (!Array.isArray(parsed.captions) || typeof parsed.narrationText !== 'string') return null
+    const activeTab: EditorTab =
+      parsed.activeTab === 'captions' || parsed.activeTab === 'narration' || parsed.activeTab === 'jobs'
+        ? parsed.activeTab
+        : 'captions'
     return {
       captions: parsed.captions.filter(
         (item: CaptionItem) =>
@@ -216,7 +228,7 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
           : 'image'
 
       return {
-        id: `local-${Date.now()}-${index}`,
+        id: createLocalId(`local-${index}`),
         name: file.name,
         kind,
         source: 'local' as const,
@@ -235,7 +247,7 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
     setCaptions((current) => [
       ...current,
       {
-        id: `caption-${Date.now()}`,
+        id: createLocalId('caption'),
         start: captionDraft.start,
         end: captionDraft.end,
         text: captionDraft.text.trim(),
@@ -253,7 +265,7 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
         ...current,
         {
           ...target,
-          id: `caption-${Date.now()}`,
+          id: createLocalId('caption'),
         },
       ]
     })
@@ -320,7 +332,6 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
       }
 
       window.speechSynthesis.speak(utterance)
-      setIsSpeaking(true)
 
       const maxPreviewLength = 60
       const preview = narrationText.length > maxPreviewLength ? narrationText.slice(0, maxPreviewLength) + '…' : narrationText
@@ -334,7 +345,7 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
     } else {
       // Web Speech API unavailable — register a stub job for visibility
       setNarrationNotice(
-        'Este navegador não oferece Web Speech API para reprodução local. Você ainda pode salvar o texto e testar em Chrome/Edge.',
+        'Este navegador não oferece Web Speech API para reprodução local. Você ainda pode salvar o texto e testar em um navegador compatível.',
       )
       const job = requestJob('tts-narration', {
         text: narrationText,
@@ -473,7 +484,7 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
                   {item.name}
                 </button>
               ))}
-              {mediaLibrary.length === 0 && <span className="list-empty">Timeline vazia.</span>}
+              {mediaLibrary.length === 0 && <p className="list-empty">Timeline vazia.</p>}
             </div>
           </div>
         </section>
@@ -539,7 +550,11 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
               </div>
               <ul className="caption-list">
                 {captions.map((item) => (
-                  <li key={item.id} className={item.id === activeCaptionId ? 'active-caption' : ''}>
+                  <li
+                    key={item.id}
+                    className={item.id === activeCaptionId ? 'active-caption' : ''}
+                    aria-current={item.id === activeCaptionId ? 'true' : undefined}
+                  >
                     <div className="caption-item-header">
                       <span>
                         {item.start} → {item.end}
@@ -547,7 +562,7 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
                       <div className="top-actions">
                         <button
                           type="button"
-                          className="caption-delete-btn"
+                          className="caption-action-btn"
                           onClick={() => duplicateCaption(item.id)}
                           aria-label="Duplicar legenda"
                         >
@@ -555,7 +570,7 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
                         </button>
                         <button
                           type="button"
-                          className="caption-delete-btn"
+                          className="caption-action-btn"
                           onClick={() => deleteCaption(item.id)}
                           aria-label="Remover legenda"
                         >
@@ -583,7 +598,11 @@ export function EditorPage({ project, onBackToDashboard, onBackToLanding }: Edit
                   As vozes do sistema ainda não foram carregadas. Se necessário, aguarde alguns segundos ou recarregue.
                 </p>
               )}
-              {narrationNotice && <p className="speech-notice">{narrationNotice}</p>}
+              {narrationNotice && (
+                <p className="speech-notice" aria-live="polite" role="status">
+                  {narrationNotice}
+                </p>
+              )}
 
               <div className="voice-filters">
                 <select
